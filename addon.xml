@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.highporn"
+       name="HighPorn"
+       version="1.0.0"
+       provider-name="yugimaster">
+  <requires>
+    <import addon="script.module.beautifulsoup4" version="4.3.2"/>
+    <import addon="script.module.requests" version="2.14.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">Watch online jav streaming for free</summary>
+    <description lang="en">Daily updated japanese and asian adult xxx streaming movies, watch online, it's free</description>
+    <platform>all</platform>
+    <website><![CDATA[https://github.com/yugimaster/plugin.video.highporn]]></website>
+    <forum></forum>
+    <source><![CDATA[https://github.com/yugimaster/plugin.video.highporn]]></source>
+  </extension>
+</addon>
