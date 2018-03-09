@@ -29,8 +29,7 @@ class HighPorn(object):
         if not data or data == '{"status": "Fail"}':
             return None
         soup = BeautifulSoup(data, 'html.parser')
-        videolist = soup.find_all("div", {"class": "col-sm-6 col-md-4 col-lg-4"})
-        return videolist
+        return soup
 
     def detail(self, url_link):
         url = HOST + url_link

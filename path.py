@@ -95,7 +95,7 @@ def input_keyword():
     keyboard.doModal()
     if (keyboard.isConfirmed()):
         keyword = keyboard.getText()
-        url = plugin.url_for("search", keyword=keyword)
+        url = plugin.url_for("movie_list", params=keyword)
         plugin.redirect(url)
 
 
@@ -123,28 +123,39 @@ def search(keyword):
         yield item
 
 
-# @plugin.route('/movie_list/<method>/')
-# def movie_list(method):
-#     if method not in ["hot", "new", "all"]:
-#         return
-#     if method in ["hot", "new"]:
-#         r_method = "new_hot"
-#     else:
-#         r_method = "all"
-#     detail = Bigmovie.movie_list(r_method)
-#     for movie in detail[method + "list"]:
-#         item = ListItem.from_dict(**{
-#             'label': movie.get("title"),
-#             'path': plugin.url_for("detail", movie_id=movie.get("id", "")),
-#             'thumbnail': movie.get("img"),
-#             'poster': movie.get("img"),
-#             'is_playable': True
-#         })
-#         print movie.get("title").encode("utf8")
-#         if r_method == "all":
-#             with open("C:\\xbmc-workspace\\LocalDB\\Movies\\" + movie.get("title").replace("/", " ") + ".strm", "w+") as f:
-#                 f.write(plugin.url_for("detail", movie_id=movie.get("id", "")))
-#         yield item
+@plugin.route('/movie_list/<params>/')
+def movie_list(params):
+    params = params.split("|")
+    if len(params) > 1:
+        html = HighPorn.search(params[0], params[1])
+    else:
+        html = HighPorn.search(params[0])
+    data = get_search_result_json(html)
+    if not data:
+        return
+    item = ListItem.from_dict(**{
+        'label': colorize("Home", "yellow"),
+        'icon': ADDON_PATH + "/resources/media/home.png",
+        'path': plugin.url_for("index"),
+        'is_playable': False
+    })
+    yield item
+    for video in data['video_list']:
+        item = ListItem.from_dict(**{
+            'label': video['title'],
+            'icon': video['image'],
+            'fanart': video['image'],
+            'path': plugin.url_for("movie_detail", url_link=video['link']),
+            'is_playable': False
+        })
+        yield item
+    for page in data['page_list']:
+        item = ListItem.from_dict(**{
+            'label': page['name'],
+            'path': plugin.url_for("movie_list", params=page['keywords']),
+            'is_playable': False
+        })
+        yield item
 
 
 # @plugin.route('/tv_list/<method>/')
@@ -236,7 +247,7 @@ def actor_list(actors):
         listitem = {
             'label': item,
             'icon': ADDON_PATH + "/resources/media/actors.png",
-            'path': plugin.url_for("search", keyword=item)
+            'path': plugin.url_for("movie_list", params=item)
         }
         yield listitem
 
@@ -248,7 +259,7 @@ def category_list(category):
         listitem = {
             'label': item,
             'icon': ADDON_PATH + "/resources/media/category.png",
-            'path': plugin.url_for("search", keyword=item)
+            'path': plugin.url_for("movie_list", params=item)
         }
         yield listitem
 
@@ -304,8 +315,41 @@ def get_movie_detail_json(detail):
     result['plot'] = meta_description.get('content')
     result['genre'] = '|'.join(keywords.split(', '))
     result['actors'] = actors
-    import json
-    print json.dumps(result)
+    return result
+
+
+def get_search_result_json(data):
+    if not data:
+        return None
+    result = {}
+    video_list = []
+    page_list = []
+    div_videolist = data.find_all("div", {"class": "col-sm-6 col-md-4 col-lg-4"})
+    if not div_videolist:
+        return None
+    ul_page = data.find("ul", {"class": "pagination pagination-lg"})
+    if ul_page:
+        a_page = ul_page.find_all('a')
+    else:
+        a_page = []
+    for item in div_videolist:
+        link = item.find('a').get('href')
+        img_url = item.find('img').get('src')
+        img = "http:" + img_url if img_url[:4] != "http" else img_url
+        title = item.find('img').get('title')
+        listitem = {"title": title, "image": img, "link": link}
+        video_list.append(listitem)
+    for a in a_page:
+        link = a.get('href')
+        page_name = a.get_text()
+        params = link.split('?')[1]
+        param1 = params.split('&')[0]
+        param2 = params.split('&')[1]
+        keywords = param1.split('=')[1] + "|" + param2.split('=')[1]
+        item = {"url": link, "keywords": keywords, "name": page_name}
+        page_list.append(item)
+    result['video_list'] = video_list
+    result['page_list'] = page_list
     return result
 
 
