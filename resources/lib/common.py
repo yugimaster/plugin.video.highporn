@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 import requests
 import traceback
+import threading
+from functools import wraps
 
 
 def colorize(label, color):
@@ -35,3 +37,18 @@ def PostHttpData(url, data=None):
 
 def print_exc():
     traceback.print_exc()
+
+
+def run_async(func):
+    """
+    Decorator to run a function in a separate thread
+    """
+    @wraps(func)
+    def async_func(*args, **kwargs):
+        func_hl = threading.Thread(target=func,
+                                   args=args,
+                                   kwargs=kwargs)
+        func_hl.start()
+        return func_hl
+
+    return async_func

@@ -3,6 +3,7 @@
 from kodiswift import Plugin, CLI_MODE, xbmcaddon, ListItem, xbmc, xbmcgui, xbmcplugin
 import os
 import sys
+import json
 try:
     from ChineseKeyboard import Keyboard
 except Exception, e:
@@ -49,7 +50,7 @@ def index():
     item = ListItem.from_dict(**{
         'label': colorize("History List", "yellow"),
         'icon': ADDON_PATH + "/resources/media/history.png",
-        'path': "",
+        'path': plugin.url_for("history_list"),
         'is_playable': False
     })
     yield item
@@ -264,31 +265,31 @@ def category_list(category):
         yield listitem
 
 
-# def add_history(seasonId, index, Esid, title):
-#     if "list" not in HISTORY:
-#         HISTORY["list"] = []
-#     for l in HISTORY["list"]:
-#         if l["seasonId"] == seasonId:
-#             HISTORY["list"].remove(l)
-#     item = {"seasonId": seasonId,
-#             "index": index,
-#             "sid": Esid,
-#             "season_name": title}
-#     HISTORY["list"].insert(0, item)
-
-
-# @plugin.route('/history/list/')
-# def list_history():
-#     if "list" in HISTORY:
-#         for l in HISTORY["list"]:
-#             seasonId = l["seasonId"]
-#             index = l["index"]
-#             sid = l["sid"]
-#             yield {
-#                 'label': u"[COLOR green]{title}[/COLOR]  观看到第[COLOR yellow]{index}[/COLOR]集".format(title=l["season_name"], index=l["index"]),
-#                 'path': plugin.url_for("detail", seasonId=seasonId),
-#                 'is_playable': False
-#             }
+@plugin.route('/history_list/')
+def history_list():
+    data = get_history_json()
+    video_list = data['videos']
+    if not video_list:
+        return
+    for video in video_list:
+        item = ListItem.from_dict(**{
+            'label': video['title'],
+            'icon': video['poster'],
+            'fanart': video['poster'],
+            'path': plugin.url_for("movie_detail", url_link=video['url'][19:]),
+            'is_playable': False
+        })
+        yield item
+    # if "list" in HISTORY:
+    #     for l in HISTORY["list"]:
+    #         seasonId = l["seasonId"]
+    #         index = l["index"]
+    #         sid = l["sid"]
+    #         yield {
+    #             'label': u"[COLOR green]{title}[/COLOR]  观看到第[COLOR yellow]{index}[/COLOR]集".format(title=l["season_name"], index=l["index"]),
+    #             'path': plugin.url_for("detail", seasonId=seasonId),
+    #             'is_playable': False
+    #         }
 
 
 def get_movie_detail_json(detail):
@@ -299,6 +300,7 @@ def get_movie_detail_json(detail):
     meta_title = detail.find("meta", {"property": "og:title"})
     meta_image = detail.find("meta", {"property": "og:image"})
     meta_type = detail.find("meta", {"property": "og:type"})
+    meta_url = detail.find("meta", {"property": "og:url"})
     meta_description = detail.find("meta", {"property": "og:description"})
     meta_actors = detail.find_all("meta", {"property": "video:actor"})
     meta_keywords = detail.find("meta", {"name": "keywords"})
@@ -315,6 +317,8 @@ def get_movie_detail_json(detail):
     result['plot'] = meta_description.get('content')
     result['genre'] = '|'.join(keywords.split(', '))
     result['actors'] = actors
+    result['url'] = meta_url.get('content')
+    add_history(result)
     return result
 
 
@@ -351,6 +355,41 @@ def get_search_result_json(data):
     result['video_list'] = video_list
     result['page_list'] = page_list
     return result
+
+
+def get_history_json():
+    with open(ADDON_PATH + "/history.json", "r") as f:
+        load_dict = json.load(f)
+        f.close()
+        return load_dict
+
+
+@run_async
+def add_history(result):
+    json_history = get_history_json()
+    video_list = json_history['videos']
+    total = json_history['total']
+    item = {"title": result['title'],
+            "poster": result['poster'],
+            "plot": result['plot'],
+            "genre": result['genre'],
+            "actors": result['actors'],
+            "url": result['url']}
+    if not video_list:
+        json_history['videos'].append(item)
+        json_history['total'] = total + 1
+    else:
+        for video in video_list:
+            if video['title'] == result['title']:
+                json_history['videos'].remove(video)
+                total -= 1
+                break
+        json_history['videos'].insert(0, item)
+        json_history['total'] = total + 1
+    with open(ADDON_PATH + "/history.json", "w") as f:
+        json.dump(json_history, f)
+        print "add history successfully"
+        f.close()
 
 
 def save_to_local():
