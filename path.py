@@ -4,6 +4,8 @@ from kodiswift import Plugin, CLI_MODE, xbmcaddon, ListItem, xbmc, xbmcgui, xbmc
 import os
 import sys
 import json
+import sqlite3
+import time
 try:
     from ChineseKeyboard import Keyboard
 except Exception, e:
@@ -18,12 +20,16 @@ ADDON_PATH = ADDON.getAddonInfo('path').decode("utf-8")
 ADDON_VERSION = ADDON.getAddonInfo('version')
 ADDON_DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s" % ADDON_ID).decode("utf-8")
 sys.path.append(os.path.join(ADDON_PATH, 'resources', 'lib'))
+sys.path.append(os.path.join(ADDON_PATH, 'database'))
 from highporn import *
 from common import *
+from videodb import VideoDB
+from videodb_functions import VideoDB_Functions
 
 
 plugin = Plugin()
 HighPorn = HighPorn()
+DB_FILE = ADDON_PATH + "/database/japanmovies.db"
 # PAGE_ROWS = plugin.get_setting("page_rows")
 # SEASON_CACHE = plugin.get_storage('season')
 # HISTORY = plugin.get_storage('history')
@@ -39,6 +45,8 @@ print sys.argv
 # main entrance
 @plugin.route('/')
 def index():
+    if not os.path.exists(DB_FILE):
+        create_connection()
     data = HighPorn.index()
     item = ListItem.from_dict(**{
         'label': colorize("Input Keyword", "yellow"),
@@ -56,6 +64,11 @@ def index():
     yield item
     for item in data:
         link = item.find('a').get('href')
+        try:
+            s = "{0}".format(link)
+        except Exception:
+            print_exc()
+            continue
         img_url = item.find('img').get('src')
         img = "http:" + img_url if img_url[:4] != "http" else img_url
         title = item.find('img').get('title')
@@ -267,29 +280,18 @@ def category_list(category):
 
 @plugin.route('/history_list/')
 def history_list():
-    data = get_history_json()
-    video_list = data['videos']
+    video_list = get_history_db()
     if not video_list:
         return
     for video in video_list:
         item = ListItem.from_dict(**{
-            'label': video['title'],
+            'label': video['name'],
             'icon': video['poster'],
             'fanart': video['poster'],
             'path': plugin.url_for("movie_detail", url_link=video['url'][19:]),
             'is_playable': False
         })
         yield item
-    # if "list" in HISTORY:
-    #     for l in HISTORY["list"]:
-    #         seasonId = l["seasonId"]
-    #         index = l["index"]
-    #         sid = l["sid"]
-    #         yield {
-    #             'label': u"[COLOR green]{title}[/COLOR]  观看到第[COLOR yellow]{index}[/COLOR]集".format(title=l["season_name"], index=l["index"]),
-    #             'path': plugin.url_for("detail", seasonId=seasonId),
-    #             'is_playable': False
-    #         }
 
 
 def get_movie_detail_json(detail):
@@ -297,6 +299,7 @@ def get_movie_detail_json(detail):
         return None
     result = {}
     actors = []
+    playurls = []
     meta_title = detail.find("meta", {"property": "og:title"})
     meta_image = detail.find("meta", {"property": "og:image"})
     meta_type = detail.find("meta", {"property": "og:type"})
@@ -304,21 +307,32 @@ def get_movie_detail_json(detail):
     meta_description = detail.find("meta", {"property": "og:description"})
     meta_actors = detail.find_all("meta", {"property": "video:actor"})
     meta_keywords = detail.find("meta", {"name": "keywords"})
+    div_playlist = detail.find("div", {"id": "playlist"})
+    playlist = div_playlist.find_all("span", {"class": "playlist_scene"})
     keywords = meta_keywords.get('content')
     image_url = meta_image.get('content')
     image = "http:" + image_url if image_url[:4] != "http" else image_url
     for (count, item) in enumerate(meta_actors):
         actor = item.get('content')
         actors.append(actor)
+    for episode in playlist:
+        playinfo = episode.get('data-src')
+        if not playinfo:
+            continue
+        title = episode.get_text()
+        listitem = {"name": title, "playinfo": playinfo}
+        playurls.append(listitem)
 
     result['title'] = meta_title.get('content')
+    result['numberid'] = get_movie_number_id(result['title'])
     result['poster'] = image
     result['type'] = meta_type.get('content')
     result['plot'] = meta_description.get('content')
     result['genre'] = '|'.join(keywords.split(', '))
     result['actors'] = actors
     result['url'] = meta_url.get('content')
-    add_history(result)
+    result['playlink'] = playurls
+    add_history_db(result)
     return result
 
 
@@ -364,17 +378,41 @@ def get_history_json():
         return load_dict
 
 
+def get_history_db():
+    with sqlite3.connect(DB_FILE, 120) as videos_conn:
+        cursor = videos_conn.cursor()
+        vo = VideoDB(cursor)
+        video_list = vo.get_videos()
+        videos_conn.commit()
+        cursor.close()
+        return video_list
+
+
+def get_movie_number_id(title):
+    number_id = ""
+    if "-" in title:
+        str1 = title.split(' ')[0]
+        if not str1:
+            return number_id
+        words = str1.split('-')[1]
+        if words.isdigit():
+            number_id = str1
+    return number_id
+
+
 @run_async
 def add_history(result):
     json_history = get_history_json()
     video_list = json_history['videos']
     total = json_history['total']
     item = {"title": result['title'],
+            "numberid": result['numberid'],
             "poster": result['poster'],
             "plot": result['plot'],
             "genre": result['genre'],
             "actors": result['actors'],
-            "url": result['url']}
+            "url": result['url'],
+            "playlink": result['playlink']}
     if not video_list:
         json_history['videos'].append(item)
         json_history['total'] = total + 1
@@ -392,7 +430,85 @@ def add_history(result):
         f.close()
 
 
+@run_async
+def add_history_db(result):
+    if not result:
+        return
+    saveVideoDB(result)
+    uploadTagListDB(result['genre'])
+    uploadActorListDB(result['actors'], result['numberid'])
+    saveNumberIdDB(result['numberid'])
+
+
 def save_to_local():
-    # save file to strm
-    pass
-    # insert into db
+    if not os.path.exists(DB_FILE):
+        create_connection()
+    json_history = get_history_json()
+    video_list = json_history['videos']
+    for item in video_list:
+        saveVideoDB(item)
+        uploadTagListDB(item['genre'])
+        uploadActorListDB(item['actors'], item['numberid'])
+        saveNumberIdDB(item['numberid'])
+
+
+def create_connection():
+    """
+    create a database connection to a SQLite database
+    """
+    try:
+        conn = sqlite3.connect(DB_FILE, 120)
+        cursor = conn.cursor()
+        VideoDB_Functions(cursor)
+    except Exception:
+        print_exc()
+    finally:
+        conn.close()
+
+
+def saveVideoDB(item):
+    with sqlite3.connect(DB_FILE, 120) as videos_conn:
+        cursor = videos_conn.cursor()
+        vo = VideoDB(cursor)
+        date = GetDateTimeString()
+        vo.videos_add_update(item, date, int(time.time()))
+        videos_conn.commit()
+        cursor.close()
+
+
+def saveTagDB(tag):
+    with sqlite3.connect(DB_FILE, 120) as tag_conn:
+        cursor = tag_conn.cursor()
+        ta = VideoDB(cursor)
+        ta.tag_add_update(tag)
+        tag_conn.commit()
+        cursor.close()
+
+
+def saveActorDB(actor, numberid):
+    with sqlite3.connect(DB_FILE, 120) as actor_conn:
+        cursor = actor_conn.cursor()
+        ac = VideoDB(cursor)
+        ac.actor_add_update(actor, numberid)
+        actor_conn.commit()
+        cursor.close()
+
+
+def saveNumberIdDB(numberid):
+    with sqlite3.connect(DB_FILE, 120) as numberid_conn:
+        cursor = numberid_conn.cursor()
+        nu = VideoDB(cursor)
+        nu.number_list_add_update(numberid)
+        numberid_conn.commit()
+        cursor.close()
+
+
+def uploadTagListDB(tags):
+    tag_list = tags.split('|')
+    for tag in tag_list:
+        saveTagDB(tag)
+
+
+def uploadActorListDB(actors, numberid):
+    for actor in actors:
+        saveActorDB(actor, numberid)

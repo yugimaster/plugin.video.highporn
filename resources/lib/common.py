@@ -3,6 +3,7 @@
 import requests
 import traceback
 import threading
+import time
 from functools import wraps
 
 
@@ -52,3 +53,10 @@ def run_async(func):
         return func_hl
 
     return async_func
+
+
+def GetDateTimeString():
+    str_ymd = time.strftime("%Y/%m/%d")
+    str_hms = time.strftime("%H:%M:%S")
+    str_date = str_ymd + " " + str_hms
+    return str_date
