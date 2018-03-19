@@ -75,7 +75,6 @@ def index():
         listitem = ListItem.from_dict(**{
             'label': title,
             'icon': img,
-            'fanart': img,
             'path': plugin.url_for("movie_detail", url_link=link),
             'is_playable': False
         })
@@ -130,7 +129,6 @@ def search(keyword):
         item = ListItem.from_dict(**{
             'label': title,
             'icon': img,
-            'fanart': img,
             'path': plugin.url_for("movie_detail", url_link=link),
             'is_playable': False
         })
@@ -158,7 +156,6 @@ def movie_list(params):
         item = ListItem.from_dict(**{
             'label': video['title'],
             'icon': video['image'],
-            'fanart': video['image'],
             'path': plugin.url_for("movie_detail", url_link=video['link']),
             'is_playable': False
         })
@@ -212,9 +209,8 @@ def movie_detail(url_link):
     }
     yield ListItem.from_dict(**{
         'label': "Poster",
-        'icon': data['poster'],
-        'path': plugin.url_for("episode_list", url_link=url_link),
-        'fanart': data['poster']
+        'icon': ADDON_PATH + "/resources/media/image.png",
+        'path': plugin.url_for("image_fanart", img_url=data['poster'])
     })
     yield ListItem.from_dict(**{
         'label': colorize("Actors", "green"),
@@ -226,6 +222,17 @@ def movie_detail(url_link):
         'icon': ADDON_PATH + "/resources/media/category.png",
         'path': plugin.url_for("category_list", category=data['genre']),
     })
+
+
+@plugin.route('/image_fanart/<img_url>')
+def image_fanart(img_url):
+    window = xbmcgui.WindowDialog()
+    window.setCoordinateResolution(0)
+    fanart = xbmcgui.ControlImage(0, 0, 1280, 720, img_url)
+    fanart.setPosition((1920 - fanart.getWidth()) / 2, (1080 - fanart.getHeight()) / 2)
+    window.addControl(fanart)
+    window.show()
+    window.doModal()
 
 
 @plugin.route('/episode_list/<url_link>/')
@@ -287,7 +294,6 @@ def history_list():
         item = ListItem.from_dict(**{
             'label': video['name'],
             'icon': video['poster'],
-            'fanart': video['poster'],
             'path': plugin.url_for("movie_detail", url_link=video['url'][19:]),
             'is_playable': False
         })
