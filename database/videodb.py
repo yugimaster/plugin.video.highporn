@@ -20,6 +20,26 @@ class VideoDB():
         video_list = self.video_db.getVideos()
         return video_list
 
+    def get_videos_asc(self):
+        video_list = self.video_db.getVideo_byNameOrderASC()
+        return video_list
+
+    def get_videos_added(self):
+        video_list = self.video_db.getVideo_byAddedDate()
+        return video_list
+
+    def get_videos_title_search(self, title):
+        video_list = self.video_db.getVideo_byNameLike(title)
+        return video_list
+
+    def get_genres_asc(self):
+        genre_list = self.video_db.getGenre_byNameOrderASC()
+        return genre_list
+
+    def get_actors_asc(self):
+        actor_list = self.video_db.getActor_byNameOrderASC()
+        return actor_list
+
     def videos_add_update(self, item, date, time):
         video_item = self.video_db.getVideoItem_byName(item['title'])
         try:

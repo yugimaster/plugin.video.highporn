@@ -83,6 +83,92 @@ class VideoDB_Functions():
             videos.append(listitem)
         return videos
 
+    def getVideo_byNameOrderASC(self):
+        videos = []
+        query = ' '.join((
+            "SELECT *",
+            "FROM videos ORDER BY name ASC"
+        ))
+        self.videodb_cursor.execute(query)
+        rows = self.videodb_cursor.fetchall()
+        for row in rows:
+            listitem = {"number_id": row[1],
+                        "name": row[2],
+                        "poster": row[3],
+                        "url": row[4],
+                        "description": row[5],
+                        "added_date": row[6],
+                        "added_time": row[7]}
+            videos.append(listitem)
+        return videos
+
+    def getVideo_byNameLike(self, name):
+        keyword = "%" + name + "%"
+        videos = []
+        query = ' '.join((
+            "SELECT *",
+            "FROM videos",
+            "WHERE name LIKE ?"
+        ))
+        self.videodb_cursor.execute(query, (keyword,))
+        rows = self.videodb_cursor.fetchall()
+        for row in rows:
+            listitem = {"number_id": row[1],
+                        "name": row[2],
+                        "poster": row[3],
+                        "url": row[4],
+                        "description": row[5],
+                        "added_date": row[6],
+                        "added_time": row[7]}
+            videos.append(listitem)
+        return videos
+
+    def getVideo_byAddedDate(self):
+        videos = []
+        query = ' '.join((
+            "SELECT *",
+            "FROM videos ORDER BY added_time ASC",
+            "LIMIT 25"
+        ))
+        self.videodb_cursor.execute(query)
+        rows = self.videodb_cursor.fetchall()
+        for row in rows:
+            listitem = {"number_id": row[1],
+                        "name": row[2],
+                        "poster": row[3],
+                        "url": row[4],
+                        "description": row[5],
+                        "added_date": row[6],
+                        "added_time": row[7]}
+            videos.append(listitem)
+        return videos
+
+    def getGenre_byNameOrderASC(self):
+        genres = []
+        query = ' '.join((
+            "SELECT *",
+            "FROM tag ORDER BY name ASC"
+        ))
+        self.videodb_cursor.execute(query)
+        rows = self.videodb_cursor.fetchall()
+        for row in rows:
+            genre = row[1]
+            genres.append(genre)
+        return genres
+
+    def getActor_byNameOrderASC(self):
+        actors = []
+        query = ' '.join((
+            "SELECT *",
+            "FROM actor ORDER BY name ASC"
+        ))
+        self.videodb_cursor.execute(query)
+        rows = self.videodb_cursor.fetchall()
+        for row in rows:
+            actor = row[1]
+            actors.append(actor)
+        return actors
+
     def getVideoItem_byName(self, name):
         query = ' '.join((
             "SELECT video_id, number_id, poster, url, description, descripttion_japan, categories, director, actors, scene",

@@ -30,14 +30,7 @@ from videodb_functions import VideoDB_Functions
 plugin = Plugin()
 HighPorn = HighPorn()
 DB_FILE = ADDON_PATH + "/database/japanmovies.db"
-# PAGE_ROWS = plugin.get_setting("page_rows")
-# SEASON_CACHE = plugin.get_storage('season')
-# HISTORY = plugin.get_storage('history')
 
-
-# def set_auto_play():
-#     auto_play_setting = plugin.get_setting("auto_next")
-#     print setSettingByRPC("videoplayer.autoplaynextitem", auto_play_setting)
 
 print sys.argv
 
@@ -47,7 +40,6 @@ print sys.argv
 def index():
     if not os.path.exists(DB_FILE):
         create_connection()
-    data = HighPorn.index()
     item = ListItem.from_dict(**{
         'label': colorize("Input Keyword", "yellow"),
         'icon': ADDON_PATH + "/resources/media/search.png",
@@ -56,48 +48,12 @@ def index():
     })
     yield item
     item = ListItem.from_dict(**{
-        'label': colorize("History List", "yellow"),
-        'icon': ADDON_PATH + "/resources/media/history.png",
-        'path': plugin.url_for("history_list"),
+        'label': colorize("Video List Library", "yellow"),
+        'icon': ADDON_PATH + "/resources/media/library.png",
+        'path': plugin.url_for("movie_library"),
         'is_playable': False
     })
     yield item
-    for item in data:
-        link = item.find('a').get('href')
-        try:
-            s = "{0}".format(link)
-        except Exception:
-            print_exc()
-            continue
-        img_url = item.find('img').get('src')
-        img = "http:" + img_url if img_url[:4] != "http" else img_url
-        title = item.find('img').get('title')
-        listitem = ListItem.from_dict(**{
-            'label': title,
-            'icon': img,
-            'path': plugin.url_for("movie_detail", url_link=link),
-            'is_playable': False
-        })
-        yield listitem
-
-
-# search entrance
-# @plugin.route('/hotword/')
-# def hotword():
-#     yield {
-#             'label': colorize("输入关键字搜索", "yellow"),
-#             'path': plugin.url_for("input_keyword"),
-#             'is_playable': False
-#         }
-#     hotwords = Bigmovie.hot_word()
-#     for word in hotwords["data"]["wordList"]:
-#         word = word.encode("utf8")
-#         item = {
-#             'label': colorize(word, "green"),
-#             'path': plugin.url_for("search", title=word),
-#             'is_playable': False
-#         }
-#         yield item
 
 
 # get search result by input keyword
@@ -167,27 +123,6 @@ def movie_list(params):
             'is_playable': False
         })
         yield item
-
-
-# @plugin.route('/tv_list/<method>/')
-# def tv_list(method):
-#     if method not in ["hot", "new", "all"]:
-#         return
-#     if method in ["hot", "new"]:
-#         r_method = "new_hot"
-#     else:
-#         r_method = "all"
-#     detail = Bigmovie.tv_list(r_method)
-#     for tvshow in detail[method + "list"]:
-#         item = ListItem.from_dict(**{
-#             'label': tvshow["title"],
-#             'path': plugin.url_for("episode_list", tv_id=tvshow.get("id", "")),
-#             'icon': tvshow["img"],
-#             'thumbnail': tvshow["img"],
-#             'poster': tvshow["img"],
-#             'is_playable': False
-#         })
-#         yield item
 
 
 @plugin.route('/detail/<url_link>')
@@ -293,13 +228,116 @@ def history_list():
     if not video_list:
         return
     for video in video_list:
+        item = set_video_item(video)
+        yield item
+
+
+@plugin.route('/movie_library/')
+def movie_library():
+    yield {
+        'label': "Genre",
+        'icon': ADDON_PATH + "/resources/media/category.png",
+        'path': plugin.url_for("genre_db"),
+        'is_playable': False
+    }
+    yield {
+        'label': "Title",
+        'icon': ADDON_PATH + "/resources/media/title.png",
+        'path': plugin.url_for("title_db"),
+        'is_playable': False
+    }
+    yield {
+        'label': "Actor",
+        'icon': ADDON_PATH + "/resources/media/actors.png",
+        'path': plugin.url_for("actor_db")
+    }
+    yield {
+        'label': "Recently Added",
+        'icon': ADDON_PATH + "/resources/media/recentlyadded.png",
+        'path': plugin.url_for("added_list_db")
+    }
+
+
+@plugin.route('/genre_db/')
+def genre_db():
+    genre_list = get_genres_db()
+    for item in genre_list:
         item = ListItem.from_dict(**{
-            'label': video['name'],
-            'icon': video['poster'],
-            'path': plugin.url_for("movie_detail", url_link=video['url'][19:]),
+            'label': item,
+            'icon': ADDON_PATH + "/resources/media/tag.png",
+            'path': plugin.url_for("movie_list", params=item),
             'is_playable': False
         })
         yield item
+
+
+@plugin.route('/title_db/')
+def title_db():
+    yield {
+        'label': "All Videos",
+        'icon': ADDON_PATH + "/resources/media/videos.png",
+        'path': plugin.url_for("video_list_db"),
+        'is_playable': False
+    }
+    yield {
+        'label': "Title Search",
+        'icon': ADDON_PATH + "/resources/media/search.png",
+        'path': plugin.url_for("input_title"),
+        'is_playable': False
+    }
+
+
+@plugin.route('/actor_db/')
+def actor_db():
+    actor_list = get_actors_db()
+    for actor in actor_list:
+        if not actor:
+            continue
+        item = ListItem.from_dict(**{
+            'label': actor,
+            'icon': ADDON_PATH + "/resources/media/actor.png",
+            'path': plugin.url_for("movie_list", params=actor),
+            'is_playable': False
+        })
+        yield item
+
+
+@plugin.route('/video_list_db/')
+def video_list_db():
+    video_list = get_videos_db()
+    item = ListItem.from_dict(**{
+        'label': colorize("Home", "yellow"),
+        'icon': ADDON_PATH + "/resources/media/home.png",
+        'path': plugin.url_for("index"),
+        'is_playable': False
+    })
+    yield item
+    for video in video_list:
+        item = set_video_item(video)
+        yield item
+
+
+@plugin.route('/added_list_db/')
+def added_list_db():
+    video_list = get_recently_added_db()
+    for video in video_list:
+        item = set_video_item(video)
+        yield item
+
+
+# get search result by input title
+@plugin.route("/title/")
+def input_title():
+    keyboard = Keyboard('', 'Please Input Title')
+    xbmc.sleep(1500)
+    keyboard.doModal()
+    if (keyboard.isConfirmed()):
+        keyword = keyboard.getText()
+        if keyword:
+            video_list = get_title_search_db(keyword)
+            for video in video_list:
+                item = set_video_item(video)
+                yield item
 
 
 def get_movie_detail_json(detail):
@@ -394,6 +432,66 @@ def get_history_db():
         videos_conn.commit()
         cursor.close()
         return video_list
+
+
+def get_genres_db():
+    with sqlite3.connect(DB_FILE, 120) as genres_conn:
+        cursor = genres_conn.cursor()
+        ge = VideoDB(cursor)
+        genre_list = ge.get_genres_asc()
+        genres_conn.commit()
+        cursor.close()
+        return genre_list
+
+
+def get_videos_db():
+    with sqlite3.connect(DB_FILE, 120) as videos_conn:
+        cursor = videos_conn.cursor()
+        vo = VideoDB(cursor)
+        video_list = vo.get_videos_asc()
+        videos_conn.commit()
+        cursor.close()
+        return video_list
+
+
+def get_recently_added_db():
+    with sqlite3.connect(DB_FILE, 120) as videos_conn:
+        cursor = videos_conn.cursor()
+        vo = VideoDB(cursor)
+        video_list = vo.get_videos_added()
+        videos_conn.commit()
+        cursor.close()
+        return video_list
+
+
+def get_actors_db():
+    with sqlite3.connect(DB_FILE, 120) as actors_conn:
+        cursor = actors_conn.cursor()
+        ac = VideoDB(cursor)
+        actor_list = ac.get_actors_asc()
+        actors_conn.commit()
+        cursor.close()
+        return actor_list
+
+
+def get_title_search_db(title):
+    with sqlite3.connect(DB_FILE, 120) as videos_conn:
+        cursor = videos_conn.cursor()
+        vo = VideoDB(cursor)
+        video_list = vo.get_videos_title_search(title)
+        videos_conn.commit()
+        cursor.close()
+        return video_list
+
+
+def set_video_item(item):
+    listitem = ListItem.from_dict(**{
+        'label': item['name'],
+        'icon': item['poster'],
+        'path': plugin.url_for("movie_detail", url_link=item['url'][19:]),
+        'is_playable': False
+    })
+    return listitem
 
 
 def get_movie_number_id(title):
