@@ -228,7 +228,9 @@ def movie_detail(url_link):
 def image_fanart(img_url):
     window = xbmcgui.WindowDialog()
     window.setCoordinateResolution(0)
-    fanart = xbmcgui.ControlImage(0, 0, 1280, 720, img_url)
+    bg = xbmcgui.ControlImage(0, 0, 1920, 1080, ADDON_PATH + "/resources/media/bg.png")
+    window.addControl(bg)
+    fanart = xbmcgui.ControlImage(0, 0, 1440, 900, img_url)
     fanart.setPosition((1920 - fanart.getWidth()) / 2, (1080 - fanart.getHeight()) / 2)
     window.addControl(fanart)
     window.show()
