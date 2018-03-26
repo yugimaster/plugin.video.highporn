@@ -44,24 +44,25 @@ class VideoDB():
         video_item = self.video_db.getVideoItem_byName(item['title'])
         try:
             video_id = video_item[0]
+            self.video_db.replaceVideosTime(date, time)
         except Exception:
             video_id = self.create_entry_video()
-        link_list = []
-        for link in item['playlink']:
-            link_list.append(link['playinfo'])
-        self.video_db.replaceVideos(video_id,
-                                    item['numberid'],
-                                    item['title'],
-                                    item['poster'],
-                                    item['url'],
-                                    item['plot'],
-                                    "",
-                                    ' / '.join(item['genre'].split('|')),
-                                    "",
-                                    ' / '.join(item['actors']),
-                                    ' | '.join(link_list),
-                                    date,
-                                    time)
+            link_list = []
+            for link in item['playlink']:
+                link_list.append(link['playinfo'])
+            self.video_db.replaceVideos(video_id,
+                                        item['numberid'],
+                                        item['title'],
+                                        item['poster'],
+                                        item['url'],
+                                        item['plot'],
+                                        "",
+                                        ' / '.join(item['genre'].split('|')),
+                                        "",
+                                        ' / '.join(item['actors']),
+                                        ' | '.join(link_list),
+                                        date,
+                                        time)
 
     def tag_add_update(self, tag):
         tag_item = self.video_db.getTagItem_byName(tag)
@@ -77,8 +78,20 @@ class VideoDB():
             actor_id = actor_item[0]
         except Exception:
             actor_id = self.create_entry_actor()
-        self.video_db.replaceActor(actor_id, actor, "", "")
-        self.video_db.replaceActorLink(actor_id, numberid, actor)
+            self.video_db.replaceActor(actor_id, actor, "", "")
+            self.actor_link_add_update(actor, numberid)
+
+    def actor_link_add_update(self, actor, numberid):
+        link_list = self.video_db.getActorLinkList_byName(actor)
+        if not link_list:
+            link_id = self.create_entry_actor_link()
+            self.video_db.replaceActorLink(link_id, numberid, actor)
+        else:
+            for link in link_list:
+                if numberid == link[0]:
+                    continue
+                link_id = self.create_entry_actor_link()
+                self.video_db.replaceActorLink(link_id, numberid, actor)
 
     def number_list_add_update(self, numberid):
         number_list_item = self.video_db.getNumberListItem_byNumId(numberid)
@@ -103,6 +116,11 @@ class VideoDB():
         self.cursor.execute("select coalesce(max(actor_id),0) from actor")
         actor_id = self.cursor.fetchone()[0] + 1
         return actor_id
+
+    def create_entry_actor_link(self):
+        self.cursor.execute("select coalesce(max(id),0) from actor_link")
+        link_id = self.cursor.fetchone()[0] + 1
+        return link_id
 
     def create_entry_number_list(self):
         self.cursor.execute("select coalesce(max(id),0) from number_list")

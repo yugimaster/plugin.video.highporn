@@ -148,12 +148,12 @@ def movie_detail(url_link):
         'path': plugin.url_for("image_fanart", img_url=data['poster'])
     })
     yield ListItem.from_dict(**{
-        'label': colorize("Actors", "green"),
+        'label': "Actor",
         'icon': ADDON_PATH + "/resources/media/actors.png",
         'path': plugin.url_for("actor_list", actors=actor_str),
     })
     yield ListItem.from_dict(**{
-        'label': colorize("Categories", "green"),
+        'label': "Categories",
         'icon': ADDON_PATH + "/resources/media/category.png",
         'path': plugin.url_for("category_list", category=data['genre']),
     })
@@ -294,9 +294,10 @@ def actor_db():
         if not actor:
             continue
         item = ListItem.from_dict(**{
-            'label': actor,
-            'icon': ADDON_PATH + "/resources/media/actor.png",
-            'path': plugin.url_for("movie_list", params=actor),
+            'label': actor[2] if actor[2] else actor[1],
+            'label2': actor[2],
+            'icon': actor[4] if actor[4] else ADDON_PATH + "/resources/media/actor.png",
+            'path': plugin.url_for("movie_list", params=actor[1]),
             'is_playable': False
         })
         yield item
@@ -314,6 +315,8 @@ def video_list_db():
     yield item
     for video in video_list:
         item = set_video_item(video)
+        if not item:
+            continue
         yield item
 
 
@@ -322,6 +325,8 @@ def added_list_db():
     video_list = get_recently_added_db()
     for video in video_list:
         item = set_video_item(video)
+        if not item:
+            continue
         yield item
 
 
@@ -485,8 +490,10 @@ def get_title_search_db(title):
 
 
 def set_video_item(item):
+    if not item['url']:
+        return None
     listitem = ListItem.from_dict(**{
-        'label': item['name'],
+        'label': item['desc_japan'] if item['desc_japan'] else item['name'],
         'icon': item['poster'],
         'path': plugin.url_for("movie_detail", url_link=item['url'][19:]),
         'is_playable': False

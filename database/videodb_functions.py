@@ -30,7 +30,7 @@ class VideoDB_Functions():
             actors TEXT,
             scene TEXT,
             added_date TEXT,
-            added_time TEXT)""")
+            added_time INTEGER)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS tag(
             tag_id INTEGER PRIMARY KEY,
             name TEXT,
@@ -47,12 +47,15 @@ class VideoDB_Functions():
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS actor(
             actor_id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
+            chinese_name TEXT,
             hiragana TEXT,
-            art_urls TEXT)""")
+            art_urls TEXT,
+            description TEXT,
+            desc_wiki TEXT)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS actor_link(
-            id INTEGER REFERENCES actor(actor_id),
-            media_id INTEGER REFERENCES videos(video_id),
-            name TEXT NOT NULL REFERENCES actor(name))""")
+            id INTEGER,
+            media_id INTEGER,
+            name TEXT NOT NULL)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS number_list(
             id INTEGER PRIMARY KEY,
             number_id VARCHAR(255) REFERENCES videos(number_id),
@@ -97,8 +100,9 @@ class VideoDB_Functions():
                         "poster": row[3],
                         "url": row[4],
                         "description": row[5],
-                        "added_date": row[6],
-                        "added_time": row[7]}
+                        "desc_japan": row[6],
+                        "added_date": row[11],
+                        "added_time": row[12]}
             videos.append(listitem)
         return videos
 
@@ -118,8 +122,9 @@ class VideoDB_Functions():
                         "poster": row[3],
                         "url": row[4],
                         "description": row[5],
-                        "added_date": row[6],
-                        "added_time": row[7]}
+                        "desc_japan": row[6],
+                        "added_date": row[11],
+                        "added_time": row[12]}
             videos.append(listitem)
         return videos
 
@@ -127,7 +132,7 @@ class VideoDB_Functions():
         videos = []
         query = ' '.join((
             "SELECT *",
-            "FROM videos ORDER BY added_time ASC",
+            "FROM videos ORDER BY added_time DESC",
             "LIMIT 25"
         ))
         self.videodb_cursor.execute(query)
@@ -138,8 +143,9 @@ class VideoDB_Functions():
                         "poster": row[3],
                         "url": row[4],
                         "description": row[5],
-                        "added_date": row[6],
-                        "added_time": row[7]}
+                        "desc_japan": row[6],
+                        "added_date": row[11],
+                        "added_time": row[12]}
             videos.append(listitem)
         return videos
 
@@ -157,17 +163,16 @@ class VideoDB_Functions():
         return genres
 
     def getActor_byNameOrderASC(self):
-        actors = []
         query = ' '.join((
             "SELECT *",
             "FROM actor ORDER BY name ASC"
         ))
-        self.videodb_cursor.execute(query)
-        rows = self.videodb_cursor.fetchall()
-        for row in rows:
-            actor = row[1]
-            actors.append(actor)
-        return actors
+        try:
+            self.videodb_cursor.execute(query)
+            actors = self.videodb_cursor.fetchall()
+            return actors
+        except Exception:
+            return None
 
     def getVideoItem_byName(self, name):
         query = ' '.join((
@@ -208,6 +213,19 @@ class VideoDB_Functions():
         except Exception:
             return None
 
+    def getActorLinkList_byName(self, name):
+        query = ' '.join((
+            "SELECT media_id, name",
+            "FROM actor_link",
+            "WHERE name = ?"
+        ))
+        try:
+            self.videodb_cursor.execute(query, (name,))
+            link_list = self.videodb_cursor.fetchall()
+            return link_list
+        except Exception:
+            return None
+
     def getNumberListItem_byNumId(self, numberid):
         query = ' '.join((
             "SELECT id, maker, publisher",
@@ -228,6 +246,16 @@ class VideoDB_Functions():
                 video_id, number_id, name, poster, url, description, descripttion_japan, categories, director, actors, scene, added_date, added_time)
 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            '''
+        )
+        self.videodb_cursor.execute(query, (args))
+
+    def replaceVideosTime(self, *args):
+        query = (
+            '''
+            REPLACE INTO videos(added_date, added_time)
+
+            VALUES (?, ?)
             '''
         )
         self.videodb_cursor.execute(query, (args))
