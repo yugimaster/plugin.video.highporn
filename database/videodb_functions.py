@@ -41,8 +41,8 @@ class VideoDB_Functions():
             hiragana TEXT,
             art_urls TEXT)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS director_link(
-            id INTEGER REFERENCES director(director_id),
-            media_id INTEGER REFERENCES videos(video_id),
+            id INTEGER,
+            media_id INTEGER,
             name TEXT NOT NULL)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS actor(
             actor_id INTEGER PRIMARY KEY,
@@ -58,7 +58,7 @@ class VideoDB_Functions():
             name TEXT NOT NULL)""")
         self.videodb_cursor.execute("""CREATE TABLE IF NOT EXISTS number_list(
             id INTEGER PRIMARY KEY,
-            number_id VARCHAR(255) REFERENCES videos(number_id),
+            number_id VARCHAR(255),
             maker TEXT,
             publisher TEXT)""")
 
@@ -176,12 +176,25 @@ class VideoDB_Functions():
 
     def getVideoItem_byName(self, name):
         query = ' '.join((
-            "SELECT video_id, number_id, poster, url, description, descripttion_japan, categories, director, actors, scene",
+            "SELECT video_id, number_id, poster, url, description, descripttion_japan, categories, director, actors, scene, added_date, added_time",
             "FROM videos",
             "WHERE name = ?"
         ))
         try:
             self.videodb_cursor.execute(query, (name,))
+            item = self.videodb_cursor.fetchone()
+            return item
+        except Exception:
+            return None
+
+    def getVideoItem_byId(self, video_id):
+        query = ' '.join((
+            "SELECT number_id, name, poster, url, description, descripttion_japan, categories, director, actors, scene, added_date, added_time",
+            "FROM videos",
+            "WHERE video_id = ?"
+        ))
+        try:
+            self.videodb_cursor.execute(query, (video_id,))
             item = self.videodb_cursor.fetchone()
             return item
         except Exception:
@@ -202,7 +215,7 @@ class VideoDB_Functions():
 
     def getActorItem_byName(self, name):
         query = ' '.join((
-            "SELECT actor_id, hiragana, art_urls",
+            "SELECT actor_id, chinese_name, hiragana, art_urls, description, desc_wiki",
             "FROM actor",
             "WHERE name = ?"
         ))
@@ -250,16 +263,6 @@ class VideoDB_Functions():
         )
         self.videodb_cursor.execute(query, (args))
 
-    def replaceVideosTime(self, *args):
-        query = (
-            '''
-            REPLACE INTO videos(added_date, added_time)
-
-            VALUES (?, ?)
-            '''
-        )
-        self.videodb_cursor.execute(query, (args))
-
     def replaceTag(self, *args):
         query = (
             '''
@@ -297,9 +300,9 @@ class VideoDB_Functions():
         query = (
             '''
             REPLACE INTO actor(
-                actor_id, name, hiragana, art_urls)
+                actor_id, name, chinese_name, hiragana, art_urls, description, desc_wiki)
 
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             '''
         )
         self.videodb_cursor.execute(query, (args))

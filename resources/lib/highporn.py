@@ -5,6 +5,7 @@ from common import *
 
 HOST = "http://highporn.net"
 SEARCHAPI = "/search/videos?search_query="
+VIDEOSAPI = "/videos?"
 PLAYAPI = "/play.php"
 
 
@@ -21,6 +22,15 @@ class HighPorn(object):
         soup = BeautifulSoup(data, 'html.parser')
         videolist = soup.find_all("div", {"class": "col-sm-6 col-md-4 col-lg-4"})
         return videolist[1:]
+
+    def videos(self, pagenum=1):
+        url = HOST + VIDEOSAPI + "page={0}".format(pagenum)
+        print url
+        data = GetHttpData(url)
+        if not data or data == '{"status": "Fail"}':
+            return None
+        soup = BeautifulSoup(data, 'html.parser')
+        return soup
 
     def search(self, keyword, pagenum=1):
         url = HOST + SEARCHAPI + "{0}&page={1}".format(keyword, pagenum)

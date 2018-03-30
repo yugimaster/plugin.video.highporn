@@ -23,6 +23,7 @@ sys.path.append(os.path.join(ADDON_PATH, 'resources', 'lib'))
 sys.path.append(os.path.join(ADDON_PATH, 'database'))
 from highporn import *
 from common import *
+from webbrows import *
 from videodb import VideoDB
 from videodb_functions import VideoDB_Functions
 
@@ -159,6 +160,42 @@ def movie_detail(url_link):
     })
 
 
+@plugin.route('/videodb_detail/<video_id>')
+def videodb_detail(video_id):
+    url_link = getVideoURL(video_id)
+    print "aaaa", url_link
+    detail = HighPorn.detail(url_link[19:])
+    data = get_movie_detail_json(detail)
+    if not data:
+        return
+    actor_str = ""
+    for (count, c) in enumerate(data['actors']):
+        if count != len(data['actors']) - 1:
+            actor_str = actor_str + c + "/"
+        else:
+            actor_str = actor_str + c
+    yield {
+        'label': "Playlist",
+        'icon': ADDON_PATH + "/resources/media/playlist.png",
+        'path': plugin.url_for("episode_list", url_link=url_link)
+    }
+    yield ListItem.from_dict(**{
+        'label': "Poster",
+        'icon': ADDON_PATH + "/resources/media/image.png",
+        'path': plugin.url_for("image_fanart", img_url=data['poster'])
+    })
+    yield ListItem.from_dict(**{
+        'label': "Actor",
+        'icon': ADDON_PATH + "/resources/media/actors.png",
+        'path': plugin.url_for("actor_list", actors=actor_str),
+    })
+    yield ListItem.from_dict(**{
+        'label': "Categories",
+        'icon': ADDON_PATH + "/resources/media/category.png",
+        'path': plugin.url_for("category_list", category=data['genre']),
+    })
+
+
 @plugin.route('/image_fanart/<img_url>')
 def image_fanart(img_url):
     window = xbmcgui.WindowDialog()
@@ -174,28 +211,9 @@ def image_fanart(img_url):
 
 @plugin.route('/episode_list/<url_link>/')
 def episode_list(url_link):
-    detail = HighPorn.detail(url_link)
-    playlist = detail.find("div", {"id": "playlist"})
-    playurls = playlist.find_all("span", {"class": "playlist_scene"})
-    for index, episode in enumerate(playurls):
-        title = episode.get_text()
-        playinfo = episode.get('data-src')
-        url = ""
-        if not playinfo:
-            continue
-        try:
-            if playinfo[:4] != "http":
-                url = HighPorn.playurl(playinfo)
-            else:
-                url = playinfo
-        except Exception:
-            print_exc()
-        item = ListItem(**{
-            'label': title,
-            'path': url,
-        })
-        item.set_is_playable(True)
-        yield item
+    urls = []
+    urls.append("http://highporn.net" + url_link)
+    open_web_browser(urls)
 
 
 @plugin.route('/actor_list/<actors>/')
@@ -492,10 +510,11 @@ def get_title_search_db(title):
 def set_video_item(item):
     if not item['url']:
         return None
+    video_id = getVideoId(item['name'])
     listitem = ListItem.from_dict(**{
         'label': item['desc_japan'] if item['desc_japan'] else item['name'],
         'icon': item['poster'],
-        'path': plugin.url_for("movie_detail", url_link=item['url'][19:]),
+        'path': plugin.url_for("videodb_detail", video_id=video_id),
         'is_playable': False
     })
     return listitem
@@ -625,3 +644,23 @@ def uploadTagListDB(tags):
 def uploadActorListDB(actors, numberid):
     for actor in actors:
         saveActorDB(actor, numberid)
+
+
+def getVideoId(title):
+    with sqlite3.connect(DB_FILE, 120) as video_conn:
+        cursor = video_conn.cursor()
+        vo = VideoDB(cursor)
+        video_id = vo.get_video_id(title)
+        video_conn.commit()
+        cursor.close()
+        return video_id
+
+
+def getVideoURL(video_id):
+    with sqlite3.connect(DB_FILE, 120) as video_conn:
+        cursor = video_conn.cursor()
+        vo = VideoDB(cursor)
+        url = vo.get_video_url(video_id)
+        video_conn.commit()
+        cursor.close()
+        return url
